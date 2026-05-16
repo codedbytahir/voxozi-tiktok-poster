@@ -182,7 +182,20 @@ def save_log(logs: List[Dict]) -> None:
 # ============================================================================
 
 def get_video_list() -> List[int]:
-    """Get list of all 40 videos from GitHub"""
+    """Dynamically fetch all videos from GitHub repo"""
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
+    try:
+        response = requests.get(api_url, headers={"Accept": "application/vnd.github.v3+json"})
+        if response.status_code == 200:
+            files = response.json()
+            videos = []
+            for f in files:
+                if f["name"].startswith("video-") and f["name"].endswith(".mp4"):
+                    num = int(f["name"].replace("video-", "").replace(".mp4", ""))
+                    videos.append(num)
+            return sorted(videos)
+    except Exception as e:
+        print(f"Warning: Could not fetch video list from GitHub: {e}")
     return list(range(40))
 
 def get_next_unposted_video(state: Dict) -> Optional[int]:
@@ -194,8 +207,8 @@ def get_next_unposted_video(state: Dict) -> Optional[int]:
         if video_num not in posted:
             return video_num
 
-    # All videos posted - cycle from beginning
-    return None
+    # All posted - restart from first video
+    return all_videos[0] if all_videos else 0
 
 def get_video_url(video_num: int) -> str:
     """Generate GitHub raw URL for video"""
@@ -341,7 +354,7 @@ def run_posting_job() -> Dict:
 
     if video_num is None:
         # All videos posted - cycle back
-        print("⚠️ All 40 videos have been posted. Restarting cycle...")
+        print("⚠️ All videos have been posted. Restarting cycle...")
         state = {"posted_videos": [], "post_count": 0}
         video_num = 0
         save_state(state)
@@ -395,17 +408,18 @@ def get_status() -> Dict:
     logs = load_logs()
 
     posted_count = len(state.get("posted_videos", []))
-    total_videos = 40
+    all_videos = get_video_list()
+    total_videos = len(all_videos)
 
     # Find next video to post
     posted = set(state.get("posted_videos", []))
     next_video = None
-    for i in range(total_videos):
+    for i in all_videos:
         if i not in posted:
             next_video = i
             break
     if next_video is None:
-        next_video = 0
+        next_video = all_videos[0] if all_videos else 0
 
     return {
         "posted_count": posted_count,

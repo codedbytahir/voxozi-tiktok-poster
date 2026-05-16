@@ -2,8 +2,8 @@ name: Voxozi TikTok Auto-Poster
 
 on:
   schedule:
-    # Run every 2 hours
-    - cron: '0 */2 * * *'
+    # Run every 40 minutes
+    - cron: '*/40 * * * *'
   workflow_dispatch:
     # Allow manual trigger
   repository_dispatch:
