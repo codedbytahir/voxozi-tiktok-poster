@@ -1,0 +1,61 @@
+name: Voxozi TikTok Auto-Poster
+
+on:
+  schedule:
+    # Run every 2 hours
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    # Allow manual trigger
+  repository_dispatch:
+    types: [post-video]
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  post-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Initialize state files
+        run: |
+          mkdir -p data
+
+          # Initialize state file if it doesn't exist
+          if [ ! -f data/voxozi-post-state.json ]; then
+            echo '{"posted_videos": [], "post_count": 0}' > data/voxozi-post-state.json
+          fi
+
+          # Initialize log file if it doesn't exist
+          if [ ! -f data/voxozi-post-log.json ]; then
+            echo '[]' > data/voxozi-post-log.json
+          fi
+
+      - name: Run posting job
+        env:
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          TIKTOK_ACCOUNT_ID: ${{ secrets.TIKTOK_ACCOUNT_ID }}
+        run: |
+          python3 scripts/voxozi_poster.py post
+
+      - name: Commit and push state changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/*.json
+          git diff --staged --quiet || git commit -m "Update posting state after automated run"
+          git push
